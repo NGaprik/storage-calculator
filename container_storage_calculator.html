@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Container Storage Calculator</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f4f6f8;margin:0;padding:30px;color:#222}
+.container{max-width:950px;margin:auto}
+h1{text-align:center;margin-bottom:25px}
+.card{background:#fff;border-radius:14px;padding:20px;margin-bottom:25px;box-shadow:0 6px 16px rgba(0,0,0,0.08)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:12px}
+label{display:flex;flex-direction:column;font-size:14px;font-weight:600}
+.inline{flex-direction:row;align-items:center;gap:8px;font-weight:600}
+.inline input{margin:0}
+input,select{margin-top:5px;padding:10px;border-radius:8px;border:1px solid #ccd2d8;font-size:14px}
+button{width:100%;padding:12px;background:#2d6cdf;color:white;border:none;border-radius:10px;font-size:15px;font-weight:bold;cursor:pointer;margin-top:10px}
+button:hover{background:#1f4fa3}
+table{width:100%;border-collapse:collapse;margin-top:15px}
+th,td{border-bottom:1px solid #e3e7eb;padding:8px;text-align:center}
+th{background:#f0f3f6}
+.result{font-size:20px;font-weight:bold;text-align:center;margin-top:12px}
+.subtitle{text-align:center;color:#666;margin-bottom:15px}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Container Storage Calculator</h1>
+
+<div class="card">
+<h2>Port Storage</h2>
+<div class="row">
+<label>Port<select id="port"><option>Gdansk</option><option>Gdynia</option></select></label>
+<label>Container Type<select id="type"><option>20 DV/OT/FL/RF</option><option>40 DV/HC/OT/FL/RF/HCRF</option></select></label>
+</div>
+<div class="row">
+<label>Discharge date<input type="date" id="discharge"></label>
+<label>Pick-up date<input type="date" id="pickup"></label>
+</div>
+<label class="inline"><input type="checkbox" id="imo"> Dangerous cargo (IMO)</label>
+<button onclick="calcStorage()">Calculate Storage</button>
+<div class="result" id="result"></div>
+<table id="table" style="display:none">
+<thead><tr><th>Period</th><th>Days</th><th>Rate €</th><th>Amount €</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+
+<div class="card">
+<h2>REEFER COOLING IMPORT</h2>
+<p class="subtitle">3 free days then 65 €/day</p>
+<div class="row">
+<label>Discharge date<input type="date" id="rc_discharge"></label>
+<label>Pick-up date<input type="date" id="rc_pickup"></label>
+</div>
+<button onclick="calcReefer()">Calculate Reefer</button>
+<div class="result" id="rc_result"></div>
+<table id="rc_table" style="display:none">
+<thead><tr><th>Period</th><th>Days</th><th>Rate €</th><th>Amount €</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+
+<script>
+function daysBetween(a,b){return Math.max(0,Math.ceil((b-a)/(1000*60*60*24))+1);} 
+
+function calcStorage(){
+const port=document.getElementById('port').value;
+const type=document.getElementById('type').value;
+const d=new Date(document.getElementById('discharge').value);
+const p=new Date(document.getElementById('pickup').value);
+const imo=document.getElementById('imo').checked;
+if(!d||!p||p<d){alert('Check dates');return}
+let days=daysBetween(d,p);
+let tariffs={
+Gdansk:{
+"20 DV/OT/FL/RF":[[7,0],[7,8.5],[16,17],[30,25],[30,50],[9999,90]],
+"40 DV/HC/OT/FL/RF/HCRF":[[7,0],[7,17],[16,34],[30,50],[30,100],[9999,180]]},
+Gdynia:{
+"20 DV/OT/FL/RF":[[10,0],[4,8],[16,10.5],[30,21],[30,37],[9999,74]],
+"40 DV/HC/OT/FL/RF/HCRF":[[10,0],[4,16],[16,21],[30,42],[30,74],[9999,148]]}
+};
+let arr=tariffs[port][type];
+let tbody=document.querySelector('#table tbody');tbody.innerHTML='';
+let remaining=days,total=0,period=1;
+for(let [limit,rate] of arr){
+if(remaining<=0)break;
+let used=Math.min(limit,remaining);
+let r=imo?rate*2:rate;
+let amount=used*r;
+tbody.innerHTML+=`<tr><td>${period===1?"Free period":"Period "+period}</td><td>${used}</td><td>${r}</td><td>${amount.toFixed(2)}</td></tr>`;
+remaining-=used;total+=amount;period++;}
+document.getElementById('result').innerText='TOTAL: '+total.toFixed(2)+' € ('+days+' days)';
+document.getElementById('table').style.display='table';}
+
+function calcReefer(){
+const d=new Date(document.getElementById('rc_discharge').value);
+const p=new Date(document.getElementById('rc_pickup').value);
+if(!d||!p||p<d){alert('Check dates');return}
+let days=daysBetween(d,p);
+let free=3;let paid=Math.max(0,days-free);let rate=65;let total=paid*rate;
+const tbody=document.querySelector('#rc_table tbody');tbody.innerHTML='';
+tbody.innerHTML+=`<tr><td>Free period</td><td>${Math.min(days,free)}</td><td>0</td><td>0</td></tr>`;
+if(paid>0)tbody.innerHTML+=`<tr><td>After free time</td><td>${paid}</td><td>${rate}</td><td>${total.toFixed(2)}</td></tr>`;
+document.getElementById('rc_result').innerText='TOTAL: '+total.toFixed(2)+' €';
+document.getElementById('rc_table').style.display='table';}
+</script>
+</body>
+</html>
