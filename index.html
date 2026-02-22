@@ -17,10 +17,12 @@ input,select{margin-top:5px;padding:10px;border-radius:8px;border:1px solid #ccd
 button{width:100%;padding:12px;background:#2d6cdf;color:white;border:none;border-radius:10px;font-size:15px;font-weight:bold;cursor:pointer;margin-top:10px}
 button:hover{background:#1f4fa3}
 table{width:100%;border-collapse:collapse;margin-top:15px}
-th,td{border-bottom:1px solid #e3e7eb;padding:8px;text-align:center}
-th{background:#f0f3f6}
-.result{font-size:20px;font-weight:bold;text-align:center;margin-top:12px}
+th,td{border:1px solid #e3e7eb;padding:10px;text-align:center}
+th{background:#f0f3f6;font-weight:600}
+.result{font-size:20px;font-weight:bold;text-align:center;margin:16px 0;color:#d32f2f}
 .subtitle{text-align:center;color:#666;margin-bottom:15px}
+.summary{font-size:15px;line-height:1.5;margin:12px 0;padding:10px;background:#f8f9fa;border-left:4px solid #2d6cdf}
+.date-col{width:110px}
 </style>
 </head>
 <body>
@@ -30,8 +32,18 @@ th{background:#f0f3f6}
 <div class="card">
 <h2>Port Storage</h2>
 <div class="row">
-<label>Port<select id="port"><option>Gdansk</option><option>Gdynia</option></select></label>
-<label>Container Type<select id="type"><option>20 DV/OT/FL/RF</option><option>40 DV/HC/OT/FL/RF/HCRF</option></select></label>
+<label>Port
+  <select id="port">
+    <option>Gdansk</option>
+    <option>Gdynia</option>
+  </select>
+</label>
+<label>Container Type
+  <select id="type">
+    <option>20 DV/OT/FL/RF</option>
+    <option>40 DV/HC/OT/FL/RF/HCRF</option>
+  </select>
+</label>
 </div>
 <div class="row">
 <label>Discharge date<input type="date" id="discharge"></label>
@@ -39,9 +51,20 @@ th{background:#f0f3f6}
 </div>
 <label class="inline"><input type="checkbox" id="imo"> Dangerous cargo (IMO)</label>
 <button onclick="calcStorage()">Calculate Storage</button>
+
 <div class="result" id="result"></div>
+<div id="summary" class="summary" style="display:none"></div>
 <table id="table" style="display:none">
-<thead><tr><th>Period</th><th>Days</th><th>Rate €</th><th>Amount €</th></tr></thead>
+<thead>
+  <tr>
+    <th>Period</th>
+    <th class="date-col">From</th>
+    <th class="date-col">To</th>
+    <th>Days</th>
+    <th>Rate €</th>
+    <th>Amount €</th>
+  </tr>
+</thead>
 <tbody></tbody>
 </table>
 </div>
@@ -54,57 +77,196 @@ th{background:#f0f3f6}
 <label>Pick-up date<input type="date" id="rc_pickup"></label>
 </div>
 <button onclick="calcReefer()">Calculate Reefer</button>
+
 <div class="result" id="rc_result"></div>
+<div id="rc_summary" class="summary" style="display:none"></div>
 <table id="rc_table" style="display:none">
-<thead><tr><th>Period</th><th>Days</th><th>Rate €</th><th>Amount €</th></tr></thead>
+<thead>
+  <tr>
+    <th>Period</th>
+    <th class="date-col">From</th>
+    <th class="date-col">To</th>
+    <th>Days</th>
+    <th>Rate €</th>
+    <th>Amount €</th>
+  </tr>
+</thead>
 <tbody></tbody>
 </table>
 </div>
+
 </div>
 
 <script>
-function daysBetween(a,b){return Math.max(0,Math.ceil((b-a)/(1000*60*60*24))+1);} 
+function formatDate(date) {
+  if (!date || isNaN(date)) return "—";
+  const d = date.getDate().toString().padStart(2,'0');
+  const m = (date.getMonth()+1).toString().padStart(2,'0');
+  const y = date.getFullYear();
+  return `${d}.${m}.${y}`;
+}
 
-function calcStorage(){
-const port=document.getElementById('port').value;
-const type=document.getElementById('type').value;
-const d=new Date(document.getElementById('discharge').value);
-const p=new Date(document.getElementById('pickup').value);
-const imo=document.getElementById('imo').checked;
-if(!d||!p||p<d){alert('Check dates');return}
-let days=daysBetween(d,p);
-let tariffs={
-Gdansk:{
-"20 DV/OT/FL/RF":[[7,0],[7,8.5],[16,17],[30,25],[30,50],[9999,90]],
-"40 DV/HC/OT/FL/RF/HCRF":[[7,0],[7,17],[16,34],[30,50],[30,100],[9999,180]]},
-Gdynia:{
-"20 DV/OT/FL/RF":[[10,0],[4,8],[16,10.5],[30,21],[30,37],[9999,74]],
-"40 DV/HC/OT/FL/RF/HCRF":[[10,0],[4,16],[16,21],[30,42],[30,74],[9999,148]]}
-};
-let arr=tariffs[port][type];
-let tbody=document.querySelector('#table tbody');tbody.innerHTML='';
-let remaining=days,total=0,period=1;
-for(let [limit,rate] of arr){
-if(remaining<=0)break;
-let used=Math.min(limit,remaining);
-let r=imo?rate*2:rate;
-let amount=used*r;
-tbody.innerHTML+=`<tr><td>${period===1?"Free period":"Period "+period}</td><td>${used}</td><td>${r}</td><td>${amount.toFixed(2)}</td></tr>`;
-remaining-=used;total+=amount;period++;}
-document.getElementById('result').innerText='TOTAL: '+total.toFixed(2)+' € ('+days+' days)';
-document.getElementById('table').style.display='table';}
+function daysBetween(start, end) {
+  if (!start || !end) return 0;
+  const diff = end - start;
+  return Math.max(0, Math.floor(diff / (1000*60*60*24)) + 1);
+}
 
-function calcReefer(){
-const d=new Date(document.getElementById('rc_discharge').value);
-const p=new Date(document.getElementById('rc_pickup').value);
-if(!d||!p||p<d){alert('Check dates');return}
-let days=daysBetween(d,p);
-let free=3;let paid=Math.max(0,days-free);let rate=65;let total=paid*rate;
-const tbody=document.querySelector('#rc_table tbody');tbody.innerHTML='';
-tbody.innerHTML+=`<tr><td>Free period</td><td>${Math.min(days,free)}</td><td>0</td><td>0</td></tr>`;
-if(paid>0)tbody.innerHTML+=`<tr><td>After free time</td><td>${paid}</td><td>${rate}</td><td>${total.toFixed(2)}</td></tr>`;
-document.getElementById('rc_result').innerText='TOTAL: '+total.toFixed(2)+' €';
-document.getElementById('rc_table').style.display='table';}
+function addDays(date, days) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function calcStorage() {
+  const port   = document.getElementById('port').value;
+  const type   = document.getElementById('type').value;
+  const dStr   = document.getElementById('discharge').value;
+  const pStr   = document.getElementById('pickup').value;
+  const imo    = document.getElementById('imo').checked;
+
+  if (!dStr || !pStr) {
+    alert("Please select both Discharge and Pick-up dates.");
+    return;
+  }
+
+  const discharge = new Date(dStr);
+  const pickup    = new Date(pStr);
+
+  if (isNaN(discharge) || isNaN(pickup) || pickup < discharge) {
+    alert("Pick-up date must be on or after discharge date.");
+    return;
+  }
+
+  const totalDays = daysBetween(discharge, pickup);
+
+  const tariffs = {
+    Gdansk: {
+      "20 DV/OT/FL/RF":     [[7,0], [7,8.5], [16,17], [30,25], [30,50], [9999,90]],
+      "40 DV/HC/OT/FL/RF/HCRF": [[7,0], [7,17], [16,34], [30,50], [30,100], [9999,180]]
+    },
+    Gdynia: {
+      "20 DV/OT/FL/RF":     [[10,0], [4,8], [16,10.5], [30,21], [30,37], [9999,74]],
+      "40 DV/HC/OT/FL/RF/HCRF": [[10,0], [4,16], [16,21], [30,42], [30,74], [9999,148]]
+    }
+  };
+
+  const arr = tariffs[port][type];
+  if (!arr) {
+    alert("Tariff not found for selected port and type.");
+    return;
+  }
+
+  const tbody = document.querySelector('#table tbody');
+  tbody.innerHTML = '';
+
+  let remaining = totalDays;
+  let total = 0;
+  let currentDate = new Date(discharge);
+  let periodNum = 1;
+
+  let summaryHTML = `
+    Total period: <b>${totalDays} days</b><br>
+    Discharge: <b>${formatDate(discharge)}</b> — Pick-up: <b>${formatDate(pickup)}</b>
+  `;
+
+  for (let [limit, baseRate] of arr) {
+    if (remaining <= 0) break;
+
+    const rate = imo ? baseRate * 2 : baseRate;
+    const daysInPeriod = Math.min(limit, remaining);
+
+    const from = new Date(currentDate);
+    const to   = addDays(currentDate, daysInPeriod - 1);
+
+    const amount = daysInPeriod * rate;
+    const periodLabel = (baseRate === 0) ? "Free period" : `Period ${periodNum}`;
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${periodLabel}</td>
+        <td>${formatDate(from)}</td>
+        <td>${formatDate(to)}</td>
+        <td>${daysInPeriod}</td>
+        <td>${rate.toFixed(2)}</td>
+        <td>${amount.toFixed(2)}</td>
+      </tr>`;
+
+    total += amount;
+    remaining -= daysInPeriod;
+    currentDate = addDays(currentDate, daysInPeriod);
+    if (baseRate > 0) periodNum++;
+  }
+
+  document.getElementById('result').innerText = `TOTAL: ${total.toFixed(2)} € (${totalDays} days)`;
+  document.getElementById('summary').innerHTML = summaryHTML;
+  document.getElementById('summary').style.display = 'block';
+  document.getElementById('table').style.display = 'table';
+}
+
+function calcReefer() {
+  const dStr = document.getElementById('rc_discharge').value;
+  const pStr = document.getElementById('rc_pickup').value;
+
+  if (!dStr || !pStr) {
+    alert("Please select both Discharge and Pick-up dates.");
+    return;
+  }
+
+  const discharge = new Date(dStr);
+  const pickup    = new Date(pStr);
+
+  if (isNaN(discharge) || isNaN(pickup) || pickup < discharge) {
+    alert("Pick-up date must be on or after discharge date.");
+    return;
+  }
+
+  const totalDays = daysBetween(discharge, pickup);
+  const freeDays  = 3;
+  const rate      = 65;
+  const paidDays  = Math.max(0, totalDays - freeDays);
+  const total     = paidDays * rate;
+
+  const tbody = document.querySelector('#rc_table tbody');
+  tbody.innerHTML = '';
+
+  let currentDate = new Date(discharge);
+
+  // Free period
+  const freeEnd = addDays(discharge, Math.min(freeDays, totalDays) - 1);
+  tbody.innerHTML += `
+    <tr>
+      <td>Free period</td>
+      <td>${formatDate(discharge)}</td>
+      <td>${formatDate(freeEnd)}</td>
+      <td>${Math.min(totalDays, freeDays)}</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>`;
+
+  // Paid period
+  if (paidDays > 0) {
+    const paidStart = addDays(discharge, freeDays);
+    const paidEnd   = new Date(pickup);
+    tbody.innerHTML += `
+      <tr>
+        <td>After free time</td>
+        <td>${formatDate(paidStart)}</td>
+        <td>${formatDate(paidEnd)}</td>
+        <td>${paidDays}</td>
+        <td>${rate.toFixed(2)}</td>
+        <td>${total.toFixed(2)}</td>
+      </tr>`;
+  }
+
+  document.getElementById('rc_result').innerText = `TOTAL: ${total.toFixed(2)} €`;
+  document.getElementById('rc_summary').innerHTML = `
+    Total period: <b>${totalDays} days</b><br>
+    Discharge: <b>${formatDate(discharge)}</b> — Pick-up: <b>${formatDate(pickup)}</b>
+  `;
+  document.getElementById('rc_summary').style.display = 'block';
+  document.getElementById('rc_table').style.display = 'table';
+}
 </script>
 </body>
 </html>
